@@ -3,9 +3,9 @@
 define('_ENVATO_DEBUG',false);
 
 // EXAMPLE USAGE, return all of author "dtbaker" items from codecanyon and themeforest
-$my_scraper = new envato_scraper();
-$items = $my_scraper->get_users_items('dtbaker',array('http://codecanyon.net','http://themeforest.net'));
-print_r($items);
+//$my_scraper = new envato_scraper();
+//$items = $my_scraper->get_users_items('dtbaker',array('http://codecanyon.net','http://themeforest.net'));
+//print_r($items);
 
 class envato_scraper{
 
