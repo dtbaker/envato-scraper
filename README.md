@@ -6,13 +6,15 @@ This simple PHP class scrapes the users items pages, caches them locally, and th
 
 Example Usage:
 
+```php
 // return all dtbaker items from ThemeForest and CodeCanyon
 $my_scraper = new envato_scraper();
 $items = $my_scraper->get_users_items('dtbaker',array('http://codecanyon.net','http://themeforest.net'));
 print_r($items);
+```
 
 Example Output:
-
+<pre>
 Array
 (
     [0] => Array
@@ -42,3 +44,4 @@ Array
     [2] => Array
         (
 	etc...
+</pre>
