@@ -22,6 +22,7 @@ Array
             [item_id] => 2621629
             [preview_image] => http://1.s3.envato.com/files/30243603/preview-ucm-pro_renew-invoices_pdf_customer-database_emails.jpg
             [cost] => 60
+            [sales] => 53
             [name] => Ultimate Client Manager - Pro Edition
             [category] => Php-scripts / Project-management-tools
             [thumb_image] => http://0.s3.envato.com/files/30243602/thumb-ucm-pro_open-source-php-database.png
@@ -34,6 +35,7 @@ Array
             [item_id] => 2616958
             [preview_image] => http://2.s3.envato.com/files/30196302/preview-customer-job-discussion-project-management-plugin.jpg
             [cost] => 6
+            [sales] => 7
             [name] => UCM Plugin: Project Discussion / Customer Comments
             [category] => Php-scripts / Project-management-tools
             [thumb_image] => http://3.s3.envato.com/files/30196301/thumb-customer-project-comments-and-discussion.png

@@ -68,6 +68,9 @@ class envato_scraper{
                             if(preg_match('#data-item-name="([^"]*)"#',$match,$data)){
                                 $item['name'] = html_entity_decode($data[1]);
                             }
+                            if(preg_match('#<small class="sale-count">(\d+) Sales</small>#',$match,$data)){
+                                $item['sales'] = $data[1];
+                            }
                             if(preg_match('#data-item-category="([^"]*)"#',$match,$data)){
                                 $item['category'] = $data[1];
                             }
