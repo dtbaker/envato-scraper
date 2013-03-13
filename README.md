@@ -2,7 +2,7 @@ envato-scraper
 ==============
 
 
-This simple PHP class scrapes the users items pages, caches them locally, and then processes them using simple regex to pull out all the users items into a nice PHP array.
+This simple PHP class scrapes the CSV statment down from Envato.
 
 Example Usage:
 
