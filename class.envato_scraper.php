@@ -338,7 +338,7 @@ class envato_scraper{
             @curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
             curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
             curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-            curl_setopt($ch, CURLOPT_USERAGENT, "Mozilla/4.0 (compatible;)");
+            curl_setopt($ch, CURLOPT_USERAGENT, "EnvatoScraper/1.0 (compatible;)"); // for teh devs
             curl_setopt($ch, CURLOPT_HEADER, _ENVATO_DEBUG_MODE); // debug
             curl_setopt($ch, CURLINFO_HEADER_OUT, _ENVATO_DEBUG_MODE); // debug
             $cookies = _ENVATO_TMP_DIR.'cookie-'.md5($this->username.__FILE__);
