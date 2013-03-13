@@ -8,13 +8,50 @@ Example Usage:
 
 ```php
 // return all dtbaker items from ThemeForest and CodeCanyon
+require_once 'class.envato_scraper.php';
 $my_scraper = new envato_scraper();
-$items = $my_scraper->get_users_items('dtbaker',array('http://codecanyon.net','http://themeforest.net'));
+$my_scraper->do_login('username','password');
+$statement = $my_scraper->get_statement('1/2013');
+$items = $my_scraper->get_users_items('dtbaker',array('codecanyon','themeforest')); // doesn't work with debug enabled.
+
+echo "My Statement: \n";
+print_r($statement);
+echo "My Items: \n";
 print_r($items);
 ```
 
 Example Output:
 <pre>
+My Statement:
+Array
+(
+    [0] => Array
+        (
+            [type] => sale
+            [date] => 2013-01-31 23:43:06 +1100
+            [time] => 1359636186
+            [item] => WordPress Email Ticket Support Plugin
+            [item_id] => 254823
+            [envato_item_id] => 0
+            [earnt] => 15.40
+            [amount] => 22.00
+            [rate] => 70.0
+        )
+
+    [1] => Array
+        (
+            [type] => sale
+            [date] => 2013-01-31 22:16:25 +1100
+            [time] => 1359630985
+            [item] => PHP Search Engine
+            [item_id] => 89499
+            [envato_item_id] => 0
+            [earnt] => 7.00
+            [amount] => 10.00
+            [rate] => 70.0
+        )
+        etc.....
+My Items:
 Array
 (
     [0] => Array
