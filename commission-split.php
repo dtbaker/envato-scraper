@@ -21,6 +21,8 @@
 /** START CONFIGURATION AREA **/
 
 
+// warning: make sure your server is secure before using this.
+// this script makes use of features that are not possible with the Envato API, so an account password is required.
 define('_ENVATO_USERNAME','your_envato_username');
 define('_ENVATO_PASSWORD','your_envato_password');
 
