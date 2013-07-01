@@ -320,6 +320,63 @@ class envato_scraper{
 
 
     /**
+     *
+     * This method will return an array of purchased items.
+     *
+     * @param string $url the url from your email e.g. http://codecanyon.net/user/USERNAME?pm_key=OTgxMjYx%0B
+     *
+     * @return array
+     */
+    public function verify_email_link($url){
+    
+        $urlparts = parse_url($url);
+        
+        $purchases = array();
+        
+        //login always on the main marketplace
+        $data = $this->_clean($this->_get_url($this->main_marketplace.$urlparts['path'].'?'.$urlparts['query']));
+        
+        //if we found some purchased files
+        if(preg_match('#<h2 class="underlined">Purchases of your files</h2> <ul class="fancy-list">#s', $data)){
+               
+               //grab them and put them in an array
+               preg_match('#<ul class="fancy-list">(.*)(days?|months?|years?) ago<\/li> <\/ul><\/div>#s', $data, $hits);
+               $raw = explode('<br>', strip_tags(str_replace('</li>', '</li><br>', $hits[0]), '<a><br>'));
+               
+               foreach($raw as $purchase){
+                   
+                   preg_match('#href="([^"]+)\/(\d+)"#', $purchase, $hits);
+                   
+                   if(empty($hits[2])) continue;
+                   //get time
+                   preg_match('#(\d+) (days?|months?|years?) ago#', $purchase, $time);
+                   //get license
+                   preg_match('#(Regular|Extended) License#', $purchase, $license);
+                   
+                   $purchases[] = array(
+                       'item_id' => $hits[2],
+                       'item_url' => str_replace(array('href="', '"'), array('http://'.$urlparts['host'], ''), $hits[0]),
+                       'item_name' => trim(str_replace(array($license[0], $time[0]), '', strip_tags($purchase))),
+                       'url' => $url,
+                       'text' => trim(strip_tags($purchase)),
+                       'license' => $license[1],
+                       'date' => date('Y-m-d', strtotime('- '.$time[1].' '.$time[2])),
+                   );
+                   
+               }
+               
+            if(_ENVATO_DEBUG_MODE){
+                echo 'found purchases in '.$url;
+                print_r($purchases);
+            }
+              
+        }
+        
+        return $purchases;
+
+    }
+
+    /**
      * This method handles all the remote URL gets, and caching.
      *
      * @param string $url Url to get: eg http://themeforest.net/user/dtbaker
