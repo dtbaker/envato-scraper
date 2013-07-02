@@ -68,8 +68,11 @@ class envato_scraper{
             $this->logged_in = true;
         }else{
             $auth_check = $this->_get_url('https://account.envato.com/sign_in?auto=true&to='.$marketplace_tag,array(),true); // todo - force this one?
-            if(preg_match('#/sign_out["\?]#',$auth_check)){
-                $this->authed_marketplaces[$marketplace_tag]=true;
+            if(
+                preg_match('#/sign_out["\?]#',$auth_check) && 
+                preg_match('#meta content="([^"])+" name="csrf-token"#', $auth_check, $csrf_matches)
+            ){
+                $this->authed_marketplaces[$marketplace_tag]=$csrf_matches[1];
                 return true;
             }
         }
