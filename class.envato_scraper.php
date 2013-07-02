@@ -2,7 +2,7 @@
 
 define('_ENVATO_DEBUG_MODE',false);
 define('_ENVATO_TMP_DIR',dirname(__FILE__).'/envato-cache/');
-
+define('_ENVATO_SECRET',"asiu234lk23j4234l2j42l3i4u2j34k2134nlkj2h42kjgasf"); // some unique code
 
 class envato_scraper{
 
@@ -333,7 +333,7 @@ class envato_scraper{
     private $_got_url_from_cache = false;
     private function _get_url($url,$post=array(),$force=false){
 
-        $cache_key = md5($url . serialize($post));
+        $cache_key = md5(_ENVATO_SECRET . $url . serialize($post));
         $data = ($force) ? false : $this->_get_cache($cache_key);
         if(!$data){
             $ch = curl_init($url);
@@ -344,7 +344,7 @@ class envato_scraper{
             curl_setopt($ch, CURLOPT_USERAGENT, "EnvatoScraper/1.0 (compatible;)"); // for teh devs
             curl_setopt($ch, CURLOPT_HEADER, _ENVATO_DEBUG_MODE); // debug
             curl_setopt($ch, CURLINFO_HEADER_OUT, _ENVATO_DEBUG_MODE); // debug
-            $cookies = _ENVATO_TMP_DIR.'cookie-'.md5($this->username.__FILE__);
+            $cookies = _ENVATO_TMP_DIR.'cookie-'.md5(_ENVATO_SECRET.$this->username.__FILE__);
             curl_setopt($ch, CURLOPT_COOKIEJAR, $cookies);
             curl_setopt($ch, CURLOPT_COOKIEFILE, $cookies);
             if($post){
