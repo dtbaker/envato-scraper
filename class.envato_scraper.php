@@ -22,6 +22,7 @@ class envato_scraper{
             "http://photodune.net",
         );
     private $authed_marketplaces=array();// which ones we have /sign_in?auto=true&to=X to
+    private $authenticity_tokens=array();
     private $main_marketplace = 'http://themeforest.net';
 
     public function __construct($main_marketplace='http://themeforest.net'){
@@ -31,6 +32,7 @@ class envato_scraper{
         if(!is_dir(_ENVATO_TMP_DIR) || !is_writable(_ENVATO_TMP_DIR)){
             echo 'please make sure the temp directory '._ENVATO_TMP_DIR.' is writable by PHP scripts.';
         }
+        
     }
 
     /**
@@ -70,6 +72,9 @@ class envato_scraper{
             $auth_check = $this->_get_url('https://account.envato.com/sign_in?auto=true&to='.$marketplace_tag,array(),true); // todo - force this one?
             if(preg_match('#/sign_out["\?]#',$auth_check)){
                 $this->authed_marketplaces[$marketplace_tag]=true;
+                preg_match('#<meta content="([^"]+)" name="csrf-token" />#', $auth_check, $hits);
+                $this->authenticity_tokens[$marketplace_tag]=$hits[1];
+                
                 return true;
             }
         }
@@ -98,6 +103,7 @@ class envato_scraper{
         if(!$data){
             $data = $this->_clean($this->_get_url($this->main_marketplace.'/forums',array(),true));
         }
+        
         // check if we are logged in or not.
         // simply look for the string logout and Log Out
         if($try_number>1){
@@ -179,9 +185,94 @@ class envato_scraper{
         //<span class="user_balance">$4,829.40</span>
         /*if(preg_match('#class="user_balance">\$([^<]+)<#',$data,$matches)){
             print_r($matches);
-        	$this->account_balance = preg_replace('/[^\.\d]/','',$matches[1]);
+            $this->account_balance = preg_replace('/[^\.\d]/','',$matches[1]);
         }*/
         return $this->logged_in;
+    }
+
+    /**
+     *
+     * This method will return an array of purchased items.
+     *
+     * @param string $url the url from your email e.g. http://codecanyon.net/user/USERNAME?pm_key=OTgxMjYx%0B
+     *
+     * @return array
+     */
+    public function verify_email_link($url){
+    
+        $urlparts = parse_url($url);
+        
+        $purchases = array();
+        
+        //login always on the main marketplace
+        $data = $this->_clean($this->_get_url($this->main_marketplace.$urlparts['path'].'?'.$urlparts['query']));
+        
+        //if we found some purchased files
+        if(preg_match('#<h2 class="underlined">Purchases of your files</h2> <ul class="fancy-list">#s', $data)){
+               
+               //grab them and put them in an array
+               preg_match('#<ul class="fancy-list">(.*)(days?|months?|years?) ago<\/li> <\/ul><\/div>#s', $data, $hits);
+               $raw = explode('<br>', strip_tags(str_replace('</li>', '</li><br>', $hits[0]), '<a><br>'));
+               
+               foreach($raw as $purchase){
+                   
+                   preg_match('#href="([^"]+)\/(\d+)"#', $purchase, $hits);
+                   
+                   if(empty($hits[2])) continue;
+                   //get time
+                   preg_match('#(\d+) (days?|months?|years?) ago#', $purchase, $time);
+                   //get license
+                   preg_match('#(Regular|Extended) License#', $purchase, $license);
+                   
+                   $purchases[] = array(
+                       'item_id' => $hits[2],
+                       'item_url' => str_replace(array('href="', '"'), array('http://'.$urlparts['host'], ''), $hits[0]),
+                       'item_name' => trim(str_replace(array($license[0], $time[0]), '', strip_tags($purchase))),
+                       'url' => $url,
+                       'text' => trim(strip_tags($purchase)),
+                       'license' => $license[1],
+                       'date' => date('Y-m-d', strtotime('- '.$time[1].' '.$time[2])),
+                   );
+                   
+               }
+               
+            if(_ENVATO_DEBUG_MODE){
+                echo 'found purchases in '.$url;
+                print_r($purchases);
+            }
+              
+        }
+        
+        return $purchases;
+
+    }
+
+    /**
+     *
+     * This method will return an array of purchased items.
+     *
+     * @param string $url the url from your email e.g. http://codecanyon.net/user/USERNAME?pm_key=OTgxMjYx%0B
+     *
+     * @return array
+     */
+    public function post_comment($item_id, $comment_id, $message){
+    
+        $authenticity_token = $this->get_authenticity_token();
+        
+        if(!$authenticity_token) return false;
+        
+        $post = array(
+            'utf8' => '&#x2713;',
+            'authenticity_token' => $authenticity_token,
+            'parent_id' => $comment_id,
+            'ret' => 'hidden',
+            'content' => $message,
+        );
+        
+        $result = $this->_get_url($this->main_marketplace.'/items/'.$item_id.'/comments', $post, false);
+        
+        return $result;
+
     }
 
     /**
@@ -320,63 +411,6 @@ class envato_scraper{
 
 
     /**
-     *
-     * This method will return an array of purchased items.
-     *
-     * @param string $url the url from your email e.g. http://codecanyon.net/user/USERNAME?pm_key=OTgxMjYx%0B
-     *
-     * @return array
-     */
-    public function verify_email_link($url){
-    
-        $urlparts = parse_url($url);
-        
-        $purchases = array();
-        
-        //login always on the main marketplace
-        $data = $this->_clean($this->_get_url($this->main_marketplace.$urlparts['path'].'?'.$urlparts['query']));
-        
-        //if we found some purchased files
-        if(preg_match('#<h2 class="underlined">Purchases of your files</h2> <ul class="fancy-list">#s', $data)){
-               
-               //grab them and put them in an array
-               preg_match('#<ul class="fancy-list">(.*)(days?|months?|years?) ago<\/li> <\/ul><\/div>#s', $data, $hits);
-               $raw = explode('<br>', strip_tags(str_replace('</li>', '</li><br>', $hits[0]), '<a><br>'));
-               
-               foreach($raw as $purchase){
-                   
-                   preg_match('#href="([^"]+)\/(\d+)"#', $purchase, $hits);
-                   
-                   if(empty($hits[2])) continue;
-                   //get time
-                   preg_match('#(\d+) (days?|months?|years?) ago#', $purchase, $time);
-                   //get license
-                   preg_match('#(Regular|Extended) License#', $purchase, $license);
-                   
-                   $purchases[] = array(
-                       'item_id' => $hits[2],
-                       'item_url' => str_replace(array('href="', '"'), array('http://'.$urlparts['host'], ''), $hits[0]),
-                       'item_name' => trim(str_replace(array($license[0], $time[0]), '', strip_tags($purchase))),
-                       'url' => $url,
-                       'text' => trim(strip_tags($purchase)),
-                       'license' => $license[1],
-                       'date' => date('Y-m-d', strtotime('- '.$time[1].' '.$time[2])),
-                   );
-                   
-               }
-               
-            if(_ENVATO_DEBUG_MODE){
-                echo 'found purchases in '.$url;
-                print_r($purchases);
-            }
-              
-        }
-        
-        return $purchases;
-
-    }
-
-    /**
      * This method handles all the remote URL gets, and caching.
      *
      * @param string $url Url to get: eg http://themeforest.net/user/dtbaker
@@ -440,7 +474,24 @@ class envato_scraper{
         $data = preg_replace("/\s+/"," ",$data);
         return $data;
     }
+    
+    /**
+     *
+     * This method will return the current authenticity_token of the given marketplace.
+     *
+     * @param string $marketplace
+     *
+     * @return token
+     */
+    private function get_authenticity_token($marketplace = ''){
+        
+        if(empty($marketplace)) $marketplace = $this->main_marketplace;
+        
+        $marketplace_tag = str_replace('.net','',str_replace('http://','',$marketplace));
+        
+        return isset($this->authenticity_tokens[$marketplace_tag]) ? $this->authenticity_tokens[$marketplace_tag] : false;
+    }
+
 
 }
-
 
