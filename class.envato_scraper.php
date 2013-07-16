@@ -96,7 +96,7 @@ class envato_scraper{
 
         $this->username = $username;
         if($this->waiting_on_recaptcha){
-            echo 'Waiting on recaptcha. Run script from browser.';
+            echo 'Waiting on recaptcha or manual password entry. Run script from browser.';
             return false;
         }
         if(!$data){
@@ -113,13 +113,30 @@ class envato_scraper{
             // if sign_out is present on the page then we are logged in
             // new redirect hack with new account centre setup
             $this->logged_in = $this->authenticate_marketplace($this->main_marketplace);
-        }else if($username && $password){
+        }else if($username){
 
             $data = $this->_get_url('https://account.envato.com');
             $auth_token = '';
             if(preg_match('#name="authenticity_token" type="hidden" value="([^"]+)"#',$data,$matches)){
                 $auth_token = $matches[1];
                 if($auth_token){
+
+                    if(isset($_POST['envatopassword'.md5($this->main_marketplace)])){
+                        $password = $_POST['envatopassword'.md5($this->main_marketplace)];
+                    }
+                    if(!$password){
+                        // prompt for password
+                        $this->waiting_on_recaptcha=true; //re-use this feature from the captcha thingey.
+                        ?>
+                        <br>
+                        <form action="" method="post">
+                            Enter Envato Password for account "<?php echo $username;?>": <input type="text" name="envatopassword<?php echo md5($this->main_marketplace);?>"> <br>
+                            Enter Envato Two-Factor for account "<?php echo $username;?>" (optional): <input type="text" name="envatopasswordtwofactor<?php echo md5($this->main_marketplace);?>"> <br>
+                            <input type="submit" name="go" value="Submit">
+                        </form>
+                        <?php
+                        return 0;
+                    }
                     $post_data = array(
                         "username"=>$username,
                         "password"=>$password,
@@ -128,8 +145,8 @@ class envato_scraper{
                         "commit" => 'Sign In',
                         //"from_header_bar"=>"true",
                     );
-                    if(isset($_REQUEST['authentication_code'])){
-                        $post_data['authentication_code'] = $_REQUEST['authentication_code'];
+                    if(isset($_REQUEST['envatopasswordtwofactor'.md5($this->main_marketplace)])){
+                        $post_data['authentication_code'] = $_REQUEST['envatopasswordtwofactor'.md5($this->main_marketplace)];
                     }
 
                     if(isset($_POST['recaptcha'.md5($this->main_marketplace)])){
@@ -160,7 +177,7 @@ class envato_scraper{
                             <form action="" method="post">
                                 Enter Code: <input type="text" name="recaptcha<?php echo md5($this->main_marketplace);?>"> <input type="submit" name="go" value="Submit">
                                 <?php foreach($_POST as $key=>$val){
-                                    if(strpos($key,'recaptcha')!==false && $key != 'recaptcha'.md5($this->main_marketplace)){
+                                    if(strpos($key,'recaptcha')!==false || strpos($key,'envatopassword')!==false){
                                     ?>
                                 <input type="hidden" name="<?php echo $key;?>" value="<?php echo $val;?>">
                                     <?php
