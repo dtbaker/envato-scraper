@@ -123,6 +123,10 @@ class envato_scraper{
                         "commit" => 'Sign In',
                         //"from_header_bar"=>"true",
                     );
+                    if(isset($_REQUEST['authentication_code'])){
+                        $post_data['authentication_code'] = $_REQUEST['authentication_code'];
+                    }
+
                     if(isset($_POST['recaptcha'.md5($this->main_marketplace)])){
                         $post_data["recaptcha_challenge_field"]=$_POST['recaptcha'.md5($this->main_marketplace)];
                         $post_data["recaptcha_response_field"]='manual_challenge';
