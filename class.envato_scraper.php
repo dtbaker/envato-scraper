@@ -351,7 +351,8 @@ class envato_scraper{
                         ($xy<$current_year)
                     )
                 ){
-                    $statement_url_requests[] = $this->main_marketplace . "/user/".$this->username."/download_statement_as_csv?month=".$xm.'&year='.$xy;
+                    //$statement_url_requests[] = $this->main_marketplace . "/user/".$this->username."/download_statement_as_csv?month=".$xm.'&year='.$xy;
+                    $statement_url_requests[] = $this->main_marketplace . "/statement.csv?month=".$xm.'&year='.$xy;
                     $xm++;
                 }
                 if($xm>12){
