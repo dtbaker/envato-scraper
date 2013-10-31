@@ -352,7 +352,7 @@ class envato_scraper{
                     )
                 ){
                     //$statement_url_requests[] = $this->main_marketplace . "/user/".$this->username."/download_statement_as_csv?month=".$xm.'&year='.$xy;
-                    $statement_url_requests[] = $this->main_marketplace . "/statement.csv?month=".$xm.'&year='.$xy;
+                    $statement_url_requests[] = $this->main_marketplace . "/statement/"$xy.'-'.$xm.'.csv';
                     $xm++;
                 }
                 if($xm>12){
@@ -366,7 +366,7 @@ class envato_scraper{
         }
 
         foreach($statement_url_requests as $url){
-            if(strpos($url,'month='.$current_month.'&year='.$current_year)){
+            if(strpos($url,$current_year.'-'.$current_month)){
                 // we always grab a new copy of the latest months statement:
                 // any previous months we always use the cached version if they exist.
                 $data = $this->_get_url($url,array(),true);
