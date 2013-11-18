@@ -311,7 +311,7 @@ class envato_scraper{
             'content' => $message,
         );
         
-        $result = $this->_get_url($this->main_marketplace.'/items/'.$item_id.'/comments', $post, false);
+        $result = $this->_get_url($this->main_marketplace.'/item/goto/'.$item_id.'/comments', $post, false);
         
         return $result;
 
@@ -549,4 +549,3 @@ class envato_scraper{
 
 
 }
-
