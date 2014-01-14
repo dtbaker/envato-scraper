@@ -2,7 +2,7 @@
 
 define('_ENVATO_DEBUG_MODE',false);
 define('_ENVATO_TMP_DIR',dirname(__FILE__).'/envato-cache/');
-define('_ENVATO_SECRET',"asiu234lk23j4234l2j42l3i4u2j34k2134nlkj2h42kjgasf"); // some unique code
+define('_ENVATO_SECRET',"rhrh65zre6her6j42l3i4u2j34k2134nlkj2h42kjgasf"); // some unique code
 
 class envato_scraper{
 
@@ -253,7 +253,7 @@ class envato_scraper{
         if(preg_match('#<h2 class="underlined">Purchases of your files</h2> <ul class="fancy-list">#s', $data)){
                
                //grab them and put them in an array
-               preg_match('#<ul class="fancy-list">(.*)(days?|months?|years?) ago<\/li> <\/ul><\/div>#s', $data, $hits);
+               preg_match('#<ul class="fancy-list">(.*)(days?|months?|years?) ago<\/li>(.*)?<\/ul>#s', $data, $hits);
                $raw = explode('<br>', strip_tags(str_replace('</li>', '</li><br>', $hits[0]), '<a><br>'));
                
                foreach($raw as $purchase){
@@ -291,7 +291,7 @@ class envato_scraper{
 
     /**
      *
-     * This method will return an array of purchased items.
+     * This method will post a comment. Requires the item id and the comment id of the starting comment
      *
      * @param string $url the url from your email e.g. http://codecanyon.net/user/USERNAME?pm_key=OTgxMjYx%0B
      *
@@ -307,14 +307,14 @@ class envato_scraper{
             'utf8' => '&#x2713;',
             'authenticity_token' => $authenticity_token,
             'parent_id' => $comment_id,
-            'ret' => 'hidden',
+            'ret' => 'author_dashboard',
             'content' => $message,
         );
         
         $result = $this->_get_url($this->main_marketplace.'/item/goto/'.$item_id.'/comments', $post, false);
         
-        return $result;
-
+        return preg_match('#<div class="notice flash">(\s*)<p>Your reply was added<\/p>(\s*)<\/div>#', $result);
+       
     }
 
     /**
@@ -352,7 +352,7 @@ class envato_scraper{
                     )
                 ){
                     //$statement_url_requests[] = $this->main_marketplace . "/user/".$this->username."/download_statement_as_csv?month=".$xm.'&year='.$xy;
-                    $statement_url_requests[] = $this->main_marketplace . "/statement/"$xy.'-'.$xm.'.csv';
+                    $statement_url_requests[] = $this->main_marketplace . "/statement/".$xy.'-'.$xm.'.csv';
                     $xm++;
                 }
                 if($xm>12){
