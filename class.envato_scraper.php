@@ -2,7 +2,7 @@
 
 define('_ENVATO_DEBUG_MODE',false);
 define('_ENVATO_TMP_DIR',dirname(__FILE__).'/envato-cache/');
-define('_ENVATO_SECRET',"asiu234lk23j4234l2j42l3i4u2j34k2134nlkj2h42kjgasf"); // some unique code
+define('_ENVATO_SECRET',"rhrh65zre6her6j42l3i4u2j34k2134nlkj2h42kjgasf"); // some unique code
 
 class envato_scraper{
 
@@ -70,6 +70,26 @@ class envato_scraper{
             $this->logged_in = true;
         }else{
             $auth_check = $this->_get_url('https://account.envato.com/sign_in?auto=true&to='.$marketplace_tag,array(),true); // todo - force this one?
+            
+            preg_match('#name="authenticity_token" type="hidden" value="([^"]+)"#',$auth_check ,$matches);
+            $authenticity_token = $matches[1];
+            
+            preg_match('#name="token" type="hidden" value="([^"]+)"#',$auth_check ,$matches);
+            $token = $matches[1];
+            
+            $post = array(
+                'utf8' => '&#x2713;',
+                'authenticity_token' => $authenticity_token,
+                'token' => $token
+            );
+            //echo "<pre>";
+            //print_r($post);
+            //echo $marketplace_tag;
+            //echo "</pre>";
+            
+               $auth_check = $this->_get_url('http://'.$marketplace_tag.'.net/sso/verify_token', $post, true);
+
+
             if(preg_match('#/sign_out["\?]#',$auth_check)){
                 $this->authed_marketplaces[$marketplace_tag]=true;
                 preg_match('#<meta content="([^"]+)" name="csrf-token" />#', $auth_check, $hits);
@@ -158,7 +178,9 @@ class envato_scraper{
                         echo "Login attempt $try_number with username: ".$username." <br> ";
                     }
                     $url = "https://account.envato.com/sign_in";
-                    $data = $this->_get_url($url,$post_data,true);
+                    if($_POST['go'] == 'Submit'){ $data = $this->_get_url($url,$post_data,true);} else {
+                        $data = $this->_get_url($url,$post_data,true);
+                    }
                     if(_ENVATO_DEBUG_MODE){
                         file_put_contents(_ENVATO_TMP_DIR."debug-envato_login-".$try_number.".html",$data);
                         echo "Saved LOGIN ATTEMPT file at: "._ENVATO_TMP_DIR."debug-envato_login-".$try_number.".html <br>";
@@ -231,7 +253,7 @@ class envato_scraper{
         if(preg_match('#<h2 class="underlined">Purchases of your files</h2> <ul class="fancy-list">#s', $data)){
                
                //grab them and put them in an array
-               preg_match('#<ul class="fancy-list">(.*)(days?|months?|years?) ago<\/li> <\/ul><\/div>#s', $data, $hits);
+               preg_match('#<ul class="fancy-list">(.*)(days?|months?|years?) ago<\/li>(.*)?<\/ul>#s', $data, $hits);
                $raw = explode('<br>', strip_tags(str_replace('</li>', '</li><br>', $hits[0]), '<a><br>'));
                
                foreach($raw as $purchase){
@@ -269,7 +291,7 @@ class envato_scraper{
 
     /**
      *
-     * This method will return an array of purchased items.
+     * This method will post a comment. Requires the item id and the comment id of the starting comment
      *
      * @param string $url the url from your email e.g. http://codecanyon.net/user/USERNAME?pm_key=OTgxMjYx%0B
      *
@@ -285,14 +307,14 @@ class envato_scraper{
             'utf8' => '&#x2713;',
             'authenticity_token' => $authenticity_token,
             'parent_id' => $comment_id,
-            'ret' => 'hidden',
+            'ret' => 'author_dashboard',
             'content' => $message,
         );
         
-        $result = $this->_get_url($this->main_marketplace.'/items/'.$item_id.'/comments', $post, false);
+        $result = $this->_get_url($this->main_marketplace.'/item/goto/'.$item_id.'/comments', $post, false);
         
-        return $result;
-
+        return preg_match('#<div class="notice flash">(\s*)<p>Your reply was added<\/p>(\s*)<\/div>#', $result);
+       
     }
 
     /**
@@ -329,7 +351,8 @@ class envato_scraper{
                         ($xy<$current_year)
                     )
                 ){
-                    $statement_url_requests[] = $this->main_marketplace . "/user/".$this->username."/download_statement_as_csv?month=".$xm.'&year='.$xy;
+                    //$statement_url_requests[] = $this->main_marketplace . "/user/".$this->username."/download_statement_as_csv?month=".$xm.'&year='.$xy;
+                    $statement_url_requests[] = $this->main_marketplace . "/statement/".$xy.'-'.$xm.'.csv';
                     $xm++;
                 }
                 if($xm>12){
@@ -343,7 +366,7 @@ class envato_scraper{
         }
 
         foreach($statement_url_requests as $url){
-            if(strpos($url,'month='.$current_month.'&year='.$current_year)){
+            if(strpos($url,$current_year.'-'.$current_month)){
                 // we always grab a new copy of the latest months statement:
                 // any previous months we always use the cached version if they exist.
                 $data = $this->_get_url($url,array(),true);
@@ -356,8 +379,8 @@ class envato_scraper{
                 }
             }
             if(preg_match('#<html#',$data)){
-                echo 'failed, probably not logged in correctly, invalid month or envato is temporarily down.';
-                return array();
+                //echo 'failed, probably not logged in correctly, invalid month or envato is temporarily down.';
+                //return array();
             }
             // save as temp file and use fgetcsv
             // dont want to use str_getcsv because it requires 5.3 and some people are still on 5.2.
@@ -439,28 +462,40 @@ class envato_scraper{
      * @return string  HTML data that came back from request.
      */
     private $_got_url_from_cache = false;
-    private function _get_url($url,$post=array(),$force=false){
+    function _get_url($url,$post=array(),$force=false){
 
         $cache_key = md5(_ENVATO_SECRET . $url . serialize($post));
         $data = ($force) ? false : $this->_get_cache($cache_key);
         if(!$data){
-            $ch = curl_init($url);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            @curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-            curl_setopt($ch, CURLOPT_USERAGENT, "EnvatoScraper/1.0 (compatible;)"); // for teh devs
+            
+           
+            $ch=curl_init();
+        	curl_setopt($ch, CURLOPT_URL, $url);
+        	//curl_setopt($ch, CURLOPT_HEADER, 0);
             curl_setopt($ch, CURLOPT_HEADER, _ENVATO_DEBUG_MODE); // debug
             curl_setopt($ch, CURLINFO_HEADER_OUT, _ENVATO_DEBUG_MODE); // debug
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        	curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        	curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);            
             $cookies = _ENVATO_TMP_DIR.'cookie-'.md5(_ENVATO_SECRET.$this->username.__FILE__);
-            curl_setopt($ch, CURLOPT_COOKIEJAR, $cookies);
-            curl_setopt($ch, CURLOPT_COOKIEFILE, $cookies);
+        	curl_setopt($ch, CURLOPT_COOKIEFILE, $cookies);
+        	curl_setopt($ch, CURLOPT_COOKIEJAR, $cookies);
+        	curl_setopt($ch, CURLOPT_SSL_VERIFYHOST,0);
+        	curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
+        	curl_setopt($ch, CURLOPT_USERAGENT, "EnvatoScraper/1.0 (compatible;)");
+        	curl_setopt($ch, CURLOPT_VERBOSE, 0);
+            
             if($post){
                 curl_setopt($ch, CURLOPT_POST, true);
                 curl_setopt($ch, CURLOPT_POSTFIELDS, $post);
+                
             }
 
             $data = curl_exec($ch);
+            
+            //echo "<br />".$last_url = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL)."<br />";
+            
             if(_ENVATO_DEBUG_MODE){
                 $headers = curl_getinfo($ch, CURLINFO_HEADER_OUT);
                 echo '<hr>headers for url '.$url.'<br>';var_dump($headers);echo '<hr>';
@@ -514,4 +549,3 @@ class envato_scraper{
 
 
 }
-
