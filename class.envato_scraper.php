@@ -452,6 +452,69 @@ class envato_scraper{
         return $items;
     }
 
+    /**
+     *
+     * This method will return the recent reviews for your Envato items.
+     * $datefrom can be 2014-01-29 (about the time reviews started having usernames)
+     * $type can be 1 for ratings and reviews, or 2 for just reviews
+     * $item_id can be to limit results to a particular item
+     *
+     * @param bool|string $datefrom
+     * @param bool|int $type
+     * @param bool|int $item_id
+     *
+     * @return array
+     */
+    public function get_reviews(){ // todo: $datefrom=false,$type=1,$item_id=false
+
+        if(!$this->logged_in)return array();
+
+        $reviews = array();
+
+        if(_ENVATO_DEBUG_MODE){
+            echo 'grabbing reviews...';
+        }
+        $page_number = 1;
+        while(true){
+            $data = $this->_get_url( $this->main_marketplace . "/reviews?page=".$page_number);
+            if(!$data || strpos($data,'Page Not Found'))break;
+            $data = preg_replace('#\s+#',' ',$data);
+            if(preg_match_all('#id="review_\d+".*<div class="review__details"> (.*) on <a href="(/item/[^/]+/)reviews/(\d+)"[^>]+>([^<]+)</a>.*<a href="/ratings/(\d+)"[^>]+>([^<]+)</a>.*</div> </div> <div class="(review|page-controls)"#imsU',$data,$matches)){
+                foreach($matches[0] as $match_id => $match){
+
+                    $this_review = array(
+                        'rating_id' => $matches[5][$match_id],
+                        'rating_url' => '/ratings/'.$matches[5][$match_id],
+                        'buyer' => strip_tags($matches[1][$match_id]),
+                        'stars' => '',
+                        'review' => '',
+                        'item_id' => $matches[3][$match_id],
+                        'item_name' => $matches[4][$match_id],
+                        'item_url' => $matches[2][$match_id].$matches[3][$match_id],
+                        'date' => $matches[6][$match_id],
+                        'date_estimate' => date('Y-m-d',strtotime('-'.str_replace(' ago','',$matches[6][$match_id]),time())),
+                    );
+
+                    if(preg_match_all('#alt="Star-on" class="rating-basic#',$match,$stars)){
+                        $this_review['stars'] = count($stars[0]);
+                    }
+                    if(preg_match('#<div class="review__comments"> <p> <strong>Extra comments from the buyer:</strong><br />(.*)</p>#imsU',$match,$comments)){
+                        $this_review['review'] = trim($comments[1]);
+                    }
+
+                    $reviews[] = $this_review;
+
+                }
+
+            }else{
+                echo 'no matches';
+            }
+            $page_number++;
+        }
+
+        return $reviews;
+    }
+
 
     /**
      * This method handles all the remote URL gets, and caching.
