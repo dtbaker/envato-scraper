@@ -380,8 +380,10 @@ class envato_scraper{
                 }
             }
             if(preg_match('#<html#',$data)){
-                //echo 'failed, probably not logged in correctly, invalid month or envato is temporarily down.';
-                //return array();
+		        if(_ENVATO_DEBUG_MODE){
+                	echo 'failed to get statement at url: '.$url.', probably not logged in correctly, invalid month or envato is temporarily down.';
+        	    }
+                break;
             }
             // save as temp file and use fgetcsv
             // dont want to use str_getcsv because it requires 5.3 and some people are still on 5.2.
