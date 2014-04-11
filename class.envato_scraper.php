@@ -333,7 +333,7 @@ class envato_scraper{
         //if(!$this->logged_in || !$this->username || !$datefrom)return array();
 
         $items = array();
-        $current_month = date('n');
+        $current_month = date('m');
         $current_year = date('Y');
         // work out what dates we need to grab from the statement.
         list($from_month,$from_year) = explode('/',$datefrom);
@@ -351,8 +351,9 @@ class envato_scraper{
                         ($xy<$current_year)
                     )
                 ){
+                    $dm = ($xm < 10) ? '0'.$xm : $xm;
                     //$statement_url_requests[] = $this->main_marketplace . "/user/".$this->username."/download_statement_as_csv?month=".$xm.'&year='.$xy;
-                    $statement_url_requests[] = $this->main_marketplace . "/statement/".$xy.'-'.$xm.'.csv';
+                    $statement_url_requests[] = $this->main_marketplace . "/statement/".$xy.'-'.$dm.'.csv';
                     $xm++;
                 }
                 if($xm>12){
