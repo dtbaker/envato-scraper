@@ -289,7 +289,7 @@ class envato_scraper{
 
     }
 
-       /**
+    /**
      *
      * This method will post a comment. Requires the item id and the comment id of the starting comment
      *
@@ -313,7 +313,7 @@ class envato_scraper{
             'content' => $message,
         );
         
-        $result = $this->_get_url($this->main_marketplace.'/item/goto/'.$item_id.'/comments', $post, false, true);
+        $result = $this->_get_url($this->main_marketplace.'/item/goto/'.$item_id.'/comments', $post, true, true);
 
         $json = json_decode($result);
         if($json->status == 'ok'){
@@ -353,7 +353,7 @@ class envato_scraper{
             'content' => $message,
         );
         
-        $result = $this->_get_url($this->main_marketplace.'/comments/'.$comment_id, $post, false, true);
+        $result = $this->_get_url($this->main_marketplace.'/comments/'.$comment_id, $post, true, true);
 
         $json = json_decode($result);
 
