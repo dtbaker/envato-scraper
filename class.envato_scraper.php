@@ -289,13 +289,15 @@ class envato_scraper{
 
     }
 
-    /**
+       /**
      *
      * This method will post a comment. Requires the item id and the comment id of the starting comment
      *
-     * @param string $url the url from your email e.g. http://codecanyon.net/user/USERNAME?pm_key=OTgxMjYx%0B
+     * @param integer $item_id the id of the item to comment
+     * @param integer $comment_id the id of the comment to reply
+     * @param string $message the message
      *
-     * @return array
+     * @return boolean
      */
     public function post_comment($item_id, $comment_id, $message){
     
@@ -307,15 +309,66 @@ class envato_scraper{
             'utf8' => '&#x2713;',
             'authenticity_token' => $authenticity_token,
             'parent_id' => $comment_id,
-            'ret' => 'author_dashboard',
+           // 'ret' => 'author_dashboard',
             'content' => $message,
         );
         
-        $result = $this->_get_url($this->main_marketplace.'/item/goto/'.$item_id.'/comments', $post, false);
+        $result = $this->_get_url($this->main_marketplace.'/item/goto/'.$item_id.'/comments', $post, false, true);
+
+        $json = json_decode($result);
+        if($json->status == 'ok'){
+            if(preg_match('#comment_(\d+)#', $json->partial, $matches)){
+                $comment_id = intval($matches[1]);
+                return $comment_id;
+            }
+        }else if($json->status == 'error'){
+            if(_ENVATO_DEBUG_MODE){
+                echo $json->error."<br>";
+            }
+        }
         
-        return preg_match('#<div class="notice flash">(\s*)<p>Your reply was added<\/p>(\s*)<\/div>#', $result);
+        return false;
        
     }
+
+    /**
+     *
+     * This method will update a comment. Requires the comment id of the starting comment
+     *
+     * @param integer $comment_id the id of the comment to update
+     * @param string $message the message
+     *
+     * @return boolean
+     */
+    public function update_comment($comment_id, $message){
+    
+        $authenticity_token = $this->get_authenticity_token();
+        
+        if(!$authenticity_token) return false;
+        
+        $post = array(
+            'utf8' => '&#x2713;',
+            '_method' => 'put',
+            'authenticity_token' => $authenticity_token,
+            'content' => $message,
+        );
+        
+        $result = $this->_get_url($this->main_marketplace.'/comments/'.$comment_id, $post, false, true);
+
+        $json = json_decode($result);
+
+        if($json->status == 'ok'){
+            return true;
+        }else if($json->status == 'error'){
+            if(_ENVATO_DEBUG_MODE){
+                echo $json->error."<br>";
+            }
+        }
+
+        return false;
+    	
+    }
+
 
     /**
      *
@@ -525,10 +578,11 @@ class envato_scraper{
      * @param string $url Url to get: eg http://themeforest.net/user/dtbaker
      * @param array $post Any post data to send (eg: login details)
      * @param bool $force Force it to refresh, aka: dont read from cache.
+     * @param bool $ajax adds a 'X-Requested-With: XMLHttpRequest' header to the request to mimic an ajax request.
      * @return string  HTML data that came back from request.
      */
     private $_got_url_from_cache = false;
-    function _get_url($url,$post=array(),$force=false){
+    function _get_url($url,$post=array(),$force=false,$ajax=false){
 
         $cache_key = md5(_ENVATO_SECRET . $url . serialize($post));
         $data = ($force) ? false : $this->_get_cache($cache_key);
@@ -540,6 +594,7 @@ class envato_scraper{
         	//curl_setopt($ch, CURLOPT_HEADER, 0);
             curl_setopt($ch, CURLOPT_HEADER, _ENVATO_DEBUG_MODE); // debug
             curl_setopt($ch, CURLINFO_HEADER_OUT, _ENVATO_DEBUG_MODE); // debug
+            if($ajax) curl_setopt($ch, CURLOPT_HTTPHEADER, array('X-Requested-With: XMLHttpRequest'));
             curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
             curl_setopt($ch, CURLOPT_TIMEOUT, 10);
         	curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
