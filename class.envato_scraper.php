@@ -9,7 +9,7 @@ class envato_scraper{
 
     private $waiting_on_recaptcha = false;
     private $logged_in = false;
-    private $username = false;
+    public $username = false;
     // list of all supported marketplaces.
     private $marketplaces = array(
             "http://themeforest.net",
@@ -23,12 +23,15 @@ class envato_scraper{
         );
     private $authed_marketplaces=array();// which ones we have /sign_in?auto=true&to=X to
     private $authenticity_tokens=array();
-    private $main_marketplace = 'http://themeforest.net';
+    private $main_marketplace = 'http://codecanyon.net';
 
-    public function __construct($main_marketplace='http://themeforest.net'){
+    public function __construct($main_marketplace='http://codecanyon.net'){
         if(in_array($main_marketplace,$this->marketplaces)){
             $this->main_marketplace = $main_marketplace;
         }
+	    if(!is_dir(_ENVATO_TMP_DIR)){
+		    mkdir(_ENVATO_TMP_DIR);
+	    }
         if(!is_dir(_ENVATO_TMP_DIR) || !is_writable(_ENVATO_TMP_DIR)){
             echo 'please make sure the temp directory '._ENVATO_TMP_DIR.' is writable by PHP scripts.';
         }
@@ -51,7 +54,7 @@ class envato_scraper{
             if(_ENVATO_DEBUG_MODE){
                 echo " Grabbing API url: $url <bR>\n";
             }
-            $data = $this->_get_url($url,array(),false);
+            $data = $this->get_url($url,array(),false);
             if(!empty($data)) {
                 $json_data = json_decode($data, true);
                 if(_ENVATO_DEBUG_MODE){
@@ -69,26 +72,35 @@ class envato_scraper{
         if(isset($this->authed_marketplaces[$marketplace_tag])){
             $this->logged_in = true;
         }else{
-            $auth_check = $this->_get_url('https://account.envato.com/sign_in?auto=true&to='.$marketplace_tag,array(),true); // todo - force this one?
-            
+            $auth_check = $this->get_url('https://account.envato.com/sign_in?auto=true&to='.$marketplace_tag,array(),true); // todo - force this one?
+            if(!$auth_check){
+	            echo "failed to auth marketplace, try again.";
+	            return false;
+            }
+
             preg_match('#name="authenticity_token" type="hidden" value="([^"]+)"#',$auth_check ,$matches);
             $authenticity_token = $matches[1];
-            
+
             preg_match('#name="token" type="hidden" value="([^"]+)"#',$auth_check ,$matches);
             $token = $matches[1];
-            
+
+
+	        if(_ENVATO_DEBUG_MODE){
+		        echo "Authenticating $url to: ".'https://account.envato.com/sign_in?auto=true&to='.$marketplace_tag."<br>";
+		        echo "Got auth: $authenticity_token and $token <br>";
+	        }
+
             $post = array(
                 'utf8' => '&#x2713;',
                 'authenticity_token' => $authenticity_token,
                 'token' => $token
             );
-            //echo "<pre>";
-            //print_r($post);
-            //echo $marketplace_tag;
-            //echo "</pre>";
-            
-               $auth_check = $this->_get_url('http://'.$marketplace_tag.'.net/sso/verify_token', $post, true);
+            $auth_check = $this->get_url('http://'.$marketplace_tag.'.net/sso/verify_token', $post, true);
 
+
+	        if(_ENVATO_DEBUG_MODE){
+		        //echo "Auth check result: $auth_check <br>";
+	        }
 
             if(preg_match('#/sign_out["\?]#',$auth_check)){
                 $this->authed_marketplaces[$marketplace_tag]=true;
@@ -110,7 +122,7 @@ class envato_scraper{
      * @param bool $data
      * @return bool|int
      */
-    public function do_login($username,$password,$try_number=0,$data=false){
+    public function do_login($username,$password='',$try_number=0,$data=false){
 
         if($this->logged_in)return true;
 
@@ -120,7 +132,7 @@ class envato_scraper{
             return false;
         }
         if(!$data){
-            $data = $this->_clean($this->_get_url($this->main_marketplace.'/forums',array(),true));
+            $data = $this->_clean($this->get_url($this->main_marketplace.'/forums',array(),true));
         }
         
         // check if we are logged in or not.
@@ -135,7 +147,8 @@ class envato_scraper{
             $this->logged_in = $this->authenticate_marketplace($this->main_marketplace);
         }else if($username){
 
-            $data = $this->_get_url('https://account.envato.com');
+            $data = $this->get_url('https://account.envato.com');
+//	        echo $data;exit;
             $auth_token = '';
             if(preg_match('#name="authenticity_token" type="hidden" value="([^"]+)"#',$data,$matches)){
                 $auth_token = $matches[1];
@@ -150,7 +163,7 @@ class envato_scraper{
                         ?>
                         <br>
                         <form action="" method="post">
-                            Enter Envato Password for account "<?php echo $username;?>": <input type="text" name="envatopassword<?php echo md5($this->main_marketplace);?>"> <br>
+                            Enter Envato Password for account "<?php echo $username;?>": <input type="password" name="envatopassword<?php echo md5($this->main_marketplace);?>"> <br>
                             Enter Envato Two-Factor for account "<?php echo $username;?>" (optional): <input type="text" name="envatopasswordtwofactor<?php echo md5($this->main_marketplace);?>"> <br>
                             <input type="submit" name="go" value="Submit">
                         </form>
@@ -160,9 +173,13 @@ class envato_scraper{
                     $post_data = array(
                         "username"=>$username,
                         "password"=>$password,
+                        "to" => 'codecanyon',
+                        "state" => '',
                         "authenticity_token" => $auth_token,
                         "utf8" => '&#x2713;',
-                        "commit" => 'Sign In',
+                        "commit" => 'Sign+In',
+                        "recaptcha_version" => '2',
+                        "recaptcha_site_key" => '6LcpTQITAAAAACIt_xhfOTWIZnT66AeAoy5xzgFG',
                         //"from_header_bar"=>"true",
                     );
                     if(isset($_REQUEST['envatopasswordtwofactor'.md5($this->main_marketplace)])){
@@ -178,13 +195,83 @@ class envato_scraper{
                         echo "Login attempt $try_number with username: ".$username." <br> ";
                     }
                     $url = "https://account.envato.com/sign_in";
-                    if($_POST['go'] == 'Submit'){ $data = $this->_get_url($url,$post_data,true);} else {
-                        $data = $this->_get_url($url,$post_data,true);
+                    if($_POST['go'] == 'Submit'){
+	                    $data = $this->get_url($url,$post_data,true);
+                    } else {
+                        $data = $this->get_url($url,$post_data,true);
                     }
                     if(_ENVATO_DEBUG_MODE){
                         file_put_contents(_ENVATO_TMP_DIR."debug-envato_login-".$try_number.".html",$data);
                         echo "Saved LOGIN ATTEMPT file at: "._ENVATO_TMP_DIR."debug-envato_login-".$try_number.".html <br>";
                     }
+	                if ( preg_match( '#name="authenticity_token" type="hidden" value="([^"]+)"#', $data, $matches1 ) ) {
+		                if ( preg_match( '#name="token" type="hidden" value="([^"]+)"#', $data, $matches2 ) ) {
+			                if(_ENVATO_DEBUG_MODE){
+		                        echo "Got the verify_token after the /sign_in attempt, processing that callback <br>";
+		                    }
+			                $post_data = array(
+		                        "authenticity_token" => $matches1[1],
+		                        "token" => $matches2[1],
+		                        "utf8" => '&#x2713;',
+		                    );
+		                    $data = $this->get_url('http://codecanyon.net/sso/verify_token',$post_data,true);
+			                if(_ENVATO_DEBUG_MODE){
+		                        file_put_contents(_ENVATO_TMP_DIR."debug-envato_login-".$try_number."-redir-postback.html",$data);
+		                        echo "Saved LOGIN ATTEMPT REDIRECT ( http://codecanyon.net/sso/verify_token ) file at: "._ENVATO_TMP_DIR."debug-envato_login-".$try_number."-redir-postback.html <br>";
+		                    }
+			                if(preg_match('#/sign_out["\?]#',$data)){
+					            // if sign_out is present on the page then we are logged in
+					            // new redirect hack with new account centre setup
+					            $this->logged_in = $this->authenticate_marketplace($this->main_marketplace);
+				                return $this->logged_in;
+					        }
+		                }
+	                }
+	                $json_test = @json_decode($data,true);
+	                if(is_array($json_test) && isset($json_test['state']) && $json_test['state'] == 'ok' && isset($json_test['redirect']) && strlen($json_test['redirect']) > 10){
+		                $data_redirect = $this->get_url($json_test['redirect'],array(),true);
+		                if(_ENVATO_DEBUG_MODE){
+	                        file_put_contents(_ENVATO_TMP_DIR."debug-envato_login-".$try_number."-redir.html",$data_redirect);
+	                        echo "Saved LOGIN ATTEMPT REDIRECT ( ".$json_test['redirect']." ) file at: "._ENVATO_TMP_DIR."debug-envato_login-".$try_number."-redir.html <br>";
+	                    }
+		                if(strpos($data_redirect,'Now signing you into')) {
+			                // redirect worked! we're signing in :)
+			                /*<form accept-charset="UTF-8" action="verify_token" id="verify_token" method="post"><div style="margin:0;padding:0;display:inline"><input name="utf8" type="hidden" value="&#x2713;" /><input name="authenticity_token" type="hidden" value="P97yE6Vw6fu+igIJkP0PwaEfkGMGCCaQ+yuYmLeLZ9o=" /></div>
+  <input id="token" name="token" type="hidden" value="L2MHmS2qRBdMfHJOJQtI4JQiB0GsG6cy8FKzFry5W5SvxoVNqIOl9KgVSiSIla3s" />
+  <p>
+    Now signing you into CodeCanyon.
+    <input name="commit" type="submit" value="Click here" /> if you aren't automatically redirected.
+  </p>
+</form>*/
+			                if ( preg_match( '#name="authenticity_token" type="hidden" value="([^"]+)"#', $data_redirect, $matches1 ) ) {
+				                if ( preg_match( '#name="token" type="hidden" value="([^"]+)"#', $data_redirect, $matches2 ) ) {
+					                if(_ENVATO_DEBUG_MODE){
+						                echo "Got verify_token after json redirect <br>";
+					                }
+					                $post_data = array(
+				                        "authenticity_token" => $matches1[1],
+				                        "token" => $matches2[1],
+				                        "utf8" => '&#x2713;',
+				                    );
+					                $new_url = preg_replace('#/callback\?.*$#','/verify_token',$json_test['redirect']);
+				                    $data = $this->get_url($new_url,$post_data,true);
+					                if(_ENVATO_DEBUG_MODE){
+				                        file_put_contents(_ENVATO_TMP_DIR."debug-envato_login-".$try_number."-redir-postback.html",$data);
+				                        echo "Saved LOGIN ATTEMPT REDIRECT ( ".$new_url." ) file at: "._ENVATO_TMP_DIR."debug-envato_login-".$try_number."-redir-postback.html <br>";
+				                    }
+					                if(preg_match('#/sign_out["\?]#',$data)){
+							            // if sign_out is present on the page then we are logged in
+							            // new redirect hack with new account centre setup
+							            $this->logged_in = $this->authenticate_marketplace($this->main_marketplace);
+						                return $this->logged_in;
+							        }
+				                }
+			                }
+		                }
+
+			                echo "Redirect failed to load with this response: <hr><hr> $data_redirect ";
+			                return false;
+	                }
                     if(preg_match('#temporarily locked out#',$data)){
                         echo "Sorry, temporarily locked out for too many failed login attempts.";
                         return 0;
@@ -247,7 +334,7 @@ class envato_scraper{
         $purchases = array();
         
         //login always on the main marketplace
-        $data = $this->_clean($this->_get_url($this->main_marketplace.$urlparts['path'].'?'.$urlparts['query']));
+        $data = $this->_clean($this->get_url($this->main_marketplace.$urlparts['path'].'?'.$urlparts['query']));
         
         //if we found some purchased files
         if(preg_match('#<h2 class="underlined">Purchases of your files</h2> <ul class="fancy-list">#s', $data)){
@@ -293,11 +380,9 @@ class envato_scraper{
      *
      * This method will post a comment. Requires the item id and the comment id of the starting comment
      *
-     * @param integer $item_id the id of the item to comment
-     * @param integer $comment_id the id of the comment to reply
-     * @param string $message the message
+     * @param string $url the url from your email e.g. http://codecanyon.net/user/USERNAME?pm_key=OTgxMjYx%0B
      *
-     * @return boolean
+     * @return array
      */
     public function post_comment($item_id, $comment_id, $message){
     
@@ -309,66 +394,15 @@ class envato_scraper{
             'utf8' => '&#x2713;',
             'authenticity_token' => $authenticity_token,
             'parent_id' => $comment_id,
-           // 'ret' => 'author_dashboard',
+            'ret' => 'author_dashboard',
             'content' => $message,
         );
         
-        $result = $this->_get_url($this->main_marketplace.'/item/goto/'.$item_id.'/comments', $post, true, true);
-
-        $json = json_decode($result);
-        if($json->status == 'ok'){
-            if(preg_match('#comment_(\d+)#', $json->partial, $matches)){
-                $comment_id = intval($matches[1]);
-                return $comment_id;
-            }
-        }else if($json->status == 'error'){
-            if(_ENVATO_DEBUG_MODE){
-                echo $json->error."<br>";
-            }
-        }
+        $result = $this->get_url($this->main_marketplace.'/item/goto/'.$item_id.'/comments', $post, false);
         
-        return false;
+        return preg_match('#<div class="notice flash">(\s*)<p>Your reply was added<\/p>(\s*)<\/div>#', $result);
        
     }
-
-    /**
-     *
-     * This method will update a comment. Requires the comment id of the starting comment
-     *
-     * @param integer $comment_id the id of the comment to update
-     * @param string $message the message
-     *
-     * @return boolean
-     */
-    public function update_comment($comment_id, $message){
-    
-        $authenticity_token = $this->get_authenticity_token();
-        
-        if(!$authenticity_token) return false;
-        
-        $post = array(
-            'utf8' => '&#x2713;',
-            '_method' => 'put',
-            'authenticity_token' => $authenticity_token,
-            'content' => $message,
-        );
-        
-        $result = $this->_get_url($this->main_marketplace.'/comments/'.$comment_id, $post, true, true);
-
-        $json = json_decode($result);
-
-        if($json->status == 'ok'){
-            return true;
-        }else if($json->status == 'error'){
-            if(_ENVATO_DEBUG_MODE){
-                echo $json->error."<br>";
-            }
-        }
-
-        return false;
-    	
-    }
-
 
     /**
      *
@@ -423,19 +457,19 @@ class envato_scraper{
             if(strpos($url,$current_year.'-'.$current_month)){
                 // we always grab a new copy of the latest months statement:
                 // any previous months we always use the cached version if they exist.
-                $data = $this->_get_url($url,array(),true);
+                $data = $this->get_url($url,array(),true);
             }else{
                 // fall back to cache.
-                $data = $this->_get_url($url,array(),false);
+                $data = $this->get_url($url,array(),false);
                 if(preg_match('#<html#',$data) && $this->_got_url_from_cache){
                     // we got a cached html file, try again without cache mode just for kicks.
-                    $data = $this->_get_url($url,array(),true);
+                    $data = $this->get_url($url,array(),true);
                 }
             }
             if(preg_match('#<html#',$data)){
-		        if(_ENVATO_DEBUG_MODE){
-                	echo 'failed to get statement at url: '.$url.', probably not logged in correctly, invalid month or envato is temporarily down.';
-        	    }
+		if(_ENVATO_DEBUG_MODE){
+                	echo 'failed, probably not logged in correctly, invalid month or envato is temporarily down.';
+        	}
                 break;
             }
             // save as temp file and use fgetcsv
@@ -532,7 +566,7 @@ class envato_scraper{
         }
         $page_number = 1;
         while(true){
-            $data = $this->_get_url( $this->main_marketplace . "/reviews?page=".$page_number);
+            $data = $this->get_url( $this->main_marketplace . "/reviews?page=".$page_number);
             if(!$data || strpos($data,'Page Not Found'))break;
             $data = preg_replace('#\s+#',' ',$data);
             if(preg_match_all('#id="review_\d+".*<div class="review__details"> (.*) on <a href="(/item/[^/]+/)reviews/(\d+)"[^>]+>([^<]+)</a>.*<a href="/ratings/(\d+)"[^>]+>([^<]+)</a>.*</div> </div> <div class="(review|page-controls)"#imsU',$data,$matches)){
@@ -578,11 +612,10 @@ class envato_scraper{
      * @param string $url Url to get: eg http://themeforest.net/user/dtbaker
      * @param array $post Any post data to send (eg: login details)
      * @param bool $force Force it to refresh, aka: dont read from cache.
-     * @param bool $ajax adds a 'X-Requested-With: XMLHttpRequest' header to the request to mimic an ajax request.
      * @return string  HTML data that came back from request.
      */
     private $_got_url_from_cache = false;
-    function _get_url($url,$post=array(),$force=false,$ajax=false){
+    public function get_url($url,$post=array(),$force=true){
 
         $cache_key = md5(_ENVATO_SECRET . $url . serialize($post));
         $data = ($force) ? false : $this->_get_cache($cache_key);
@@ -591,12 +624,11 @@ class envato_scraper{
            
             $ch=curl_init();
         	curl_setopt($ch, CURLOPT_URL, $url);
-        	//curl_setopt($ch, CURLOPT_HEADER, 0);
-            curl_setopt($ch, CURLOPT_HEADER, _ENVATO_DEBUG_MODE); // debug
+        	curl_setopt($ch, CURLOPT_HEADER, 0);
+//            curl_setopt($ch, CURLOPT_HEADER, _ENVATO_DEBUG_MODE); // debug
             curl_setopt($ch, CURLINFO_HEADER_OUT, _ENVATO_DEBUG_MODE); // debug
-            if($ajax) curl_setopt($ch, CURLOPT_HTTPHEADER, array('X-Requested-With: XMLHttpRequest'));
-            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 20);
         	curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         	curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);            
             $cookies = _ENVATO_TMP_DIR.'cookie-'.md5(_ENVATO_SECRET.$this->username.__FILE__);
@@ -604,7 +636,7 @@ class envato_scraper{
         	curl_setopt($ch, CURLOPT_COOKIEJAR, $cookies);
         	curl_setopt($ch, CURLOPT_SSL_VERIFYHOST,0);
         	curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
-        	curl_setopt($ch, CURLOPT_USERAGENT, "EnvatoScraper/1.0 (compatible;)");
+        	curl_setopt($ch, CURLOPT_USERAGENT, "EnvatoScraper/1.1 (compatible;)");
         	curl_setopt($ch, CURLOPT_VERBOSE, 0);
             
             if($post){
@@ -615,11 +647,12 @@ class envato_scraper{
 
             $data = curl_exec($ch);
             
-            //echo "<br />".$last_url = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL)."<br />";
+//            $last_url = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
+//	        echo $last_url;
             
             if(_ENVATO_DEBUG_MODE){
                 $headers = curl_getinfo($ch, CURLINFO_HEADER_OUT);
-                echo '<hr>headers for url '.$url.'<br>';var_dump($headers);echo '<hr>';
+//                echo '<hr>headers for url '.$url.'<br>';var_dump($headers);echo '<hr>';
                 file_put_contents(_ENVATO_TMP_DIR."envato_request-".preg_replace('#[^a-z]#','',$url).".html",$data);
                 if(preg_match('#Not Allowed#',$data)){
                     echo "Failed with nginx not allowed on request $url with post data:<br>"; print_r($post);
@@ -659,7 +692,7 @@ class envato_scraper{
      *
      * @return token
      */
-    private function get_authenticity_token($marketplace = ''){
+    public function get_authenticity_token($marketplace = ''){
         
         if(empty($marketplace)) $marketplace = $this->main_marketplace;
         
